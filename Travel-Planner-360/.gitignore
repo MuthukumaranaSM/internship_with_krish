@@ -1,0 +1,20 @@
+# Dependency directories
+node_modules
+
+# Compiled JavaScript output
+dist
+
+# Logs
+*.log
+
+# IDE and OS files
+.vscode
+.idea
+.DS_Store
+
+# Database files (CRUCIAL for SQLite/TypeORM)
+*.sqlite
+*.db
+
+# Environment variables (for security)
+.env

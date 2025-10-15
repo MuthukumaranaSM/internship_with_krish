@@ -15,7 +15,7 @@ async function searchTrips(from, to, date) {
     
     try {
         const response = await axios.get(FULL_URL, {
-            // 2. FIXED: Using YOUR query parameter names
+            
             params: {
                 from: from, 
                 to: to,
@@ -53,6 +53,5 @@ async function searchTrips(from, to, date) {
     }
 }
 
-// 3. Execution
-// Use a destination like BKK for a successful test of both V1 and V2 data types.
+// Execution
 searchTrips("CMB", "BKK", "2025-12-15")

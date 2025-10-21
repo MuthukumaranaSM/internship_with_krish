@@ -1,46 +1,44 @@
-import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Query, HttpException, HttpStatus, Post, Body } from '@nestjs/common';
 import { AppService } from './app.service'; 
-import { ConfigService } from '@nestjs/config'; 
+// NOTE: We no longer need ConfigService here as the logic moved to AppService
+
+// ACTION: Define the DTO for the POST body
+class SimulationConfigDto {
+    delayMs: number;
+    failRate: number;
+}
 
 @Controller('weather')
 export class AppController {
-
-  private delay: number = 0;
   constructor(
-    private readonly appService: AppService,
-    private readonly configService: ConfigService, 
+    private readonly appService: AppService, 
   ) {}
 
+  // --- STANDARD /weather ENDPOINT (CLEAN DELEGATION) ---
   @Get()
   async find(
     @Query('destination') destination: string,
     @Query('date') date: string,
   ) {
-    
-    // --- 1. SIMULATE LATENCY (Delay) ---
-    // ACTION: Read value using configService.get()
-    // Reads WEATHER_DELAY_MS from .env file (defaults to '0' if not found)
-    const delay = this.configService.get<number>('WEATHER_DELAY_MS') || 0; 
-    console.log("weather service delay",delay);
-    
-    if (delay > 0) {
-      // Pause the request processing for that duration.
-      await new Promise(resolve => setTimeout(resolve, delay));
-      console.log("delay happens");
-    }
-
-    // --- 2. SIMULATE FAILURE (Error Rate) ---
-    // ACTION: Read value using configService.get()
-    // Reads WEATHER_FAIL_RATE from .env file (defaults to '0' if not found)
-    const failRate = this.configService.get<number>('WEATHER_FAIL_RATE') || 0;
-    
-    if (Math.random() < failRate) {
-      // Throw a 503 error to simulate service degradation
-      throw new HttpException('Weather Service Unavailable', HttpStatus.SERVICE_UNAVAILABLE);
-    }
-
-    // If no failure, proceed with normal logic
-    // NOTE: The 'date' parameter is accepted via @Query but ignored here for simplicity.
-    return this.appService.findForecast(destination); 
+    // Delegates the ENTIRE job (simulation + data fetch) to the service layer
+    return this.appService.getSimulatedForecast(destination); 
+  }
+  
+  // --- UTILITY ENDPOINT: POST /weather/config ---
+  @Post('config') 
+  updateConfig(@Body() config: SimulationConfigDto) {
+      
+      // Basic validation (required for a public endpoint)
+      if (config.delayMs < 0 || config.failRate < 0 || config.failRate > 1.0) {
+          throw new HttpException('Invalid config values. FailRate must be 0.0 to 1.0.', HttpStatus.BAD_REQUEST);
+      }
+      
+      // ACTION: Delegate the runtime update command to the service layer
+      this.appService.setSimulationConfig(config.delayMs, config.failRate);
+      
+      return { 
+          status: 'success', 
+          message: 'Simulation configuration updated dynamically.' 
+      };
   }
 }

@@ -1,6 +1,6 @@
 
 export class EventDetailsDto {
-    id: number; 
+    id: number;
     name: string;
     date: string;
     category: string;

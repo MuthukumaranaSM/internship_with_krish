@@ -7,7 +7,7 @@ export class Hotel {
   id: number; 
 
   @Column()
-  hotelId: string; // Internal identifier
+  hotelId: string;
 
   @Column()
   name: string; 
@@ -19,7 +19,10 @@ export class Hotel {
   pricePerNight: number; 
 
   @Column()
-  destination: string; // Lookup field 
+  destination: string; 
+  
+  @Column()
+  date:string;
 
   @Column({ nullable: true })
   lateCheckIn: boolean; // chaining ekata 

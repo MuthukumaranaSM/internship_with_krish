@@ -54,4 +54,4 @@ async function searchTrips(from, to, date) {
 }
 
 // Execution
-searchTrips("CMB", "BKK", "2025-12-15")
+searchTrips("CMB", "BKK", "2025-12-10")

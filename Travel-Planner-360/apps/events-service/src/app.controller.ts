@@ -12,5 +12,5 @@ export class AppController {
     @Query('date') date: string,
   ) {
     return this.appService.findEvents(destination, date);
-  }
+ }
 }

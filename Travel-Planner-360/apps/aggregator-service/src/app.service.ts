@@ -132,6 +132,9 @@ export class AppService {
 
 
     async scatterGatherSearchV1(query: TripSearchDto): Promise<TripResponseV1Dto> {
+        
+        v1Traffic++;
+
         const startTime = Date.now();
         let isDegraded = false;
         
@@ -177,7 +180,7 @@ export class AppService {
         }
         
         this.logger.log(`V1 search finished in ${Date.now() - startTime}ms. Degraded: ${isDegraded}`);
-        v1Traffic++;
+        
         
         return finalResponse;
     }
@@ -185,6 +188,8 @@ export class AppService {
     // === PART B/C: SCATTER-GATHER IMPLEMENTATION (V2 WITH BREAKER) 
     
     async scatterGatherSearchV2(query: TripSearchDto): Promise<TripResponseV2Dto> {
+
+        v2Traffic++;
         const startTime = Date.now();
         let isDegraded = false;
         
@@ -218,7 +223,7 @@ export class AppService {
             return { 
                 forecast: [], 
                 summary: "unavailable", 
-                degraded: true // REQUIRED FALLBACK STRUCTURE
+                degraded: true 
             };
         };
 
@@ -276,7 +281,6 @@ export class AppService {
         }
         
         this.logger.log(`V2 search finished in ${Date.now() - startTime}ms. Degraded: ${isDegraded}`);
-        v2Traffic++;
         
         return finalResponse;
     }
@@ -295,7 +299,7 @@ export class AppService {
             this.callServiceWithTimeout(this.serviceUrls.hotel, { destination: query.to, date: query.date }, this.TIMEOUT_MS),
         ];
         
-        // 2. --- BRANCHING LOGIC: CONDITIONAL FAN-OUT ---
+        //  BRANCHING LOGIC: CONDITIONAL FAN-OUT ---
         const shouldFetchEvents = this.isCoastal(query.to);
         
         if (shouldFetchEvents) {

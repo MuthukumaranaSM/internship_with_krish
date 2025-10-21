@@ -5,6 +5,7 @@ export class HotelDetailsDto {
     name: string;
     rating: number;
     pricePerNight: number;
+    date: string;
 }
 
 export class HotelSearchResponseDto {

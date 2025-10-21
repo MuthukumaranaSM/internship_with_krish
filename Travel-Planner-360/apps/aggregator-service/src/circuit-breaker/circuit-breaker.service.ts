@@ -10,20 +10,36 @@ enum BreakerState {
 @Injectable()
 export class CircuitBreaker {
     private state: BreakerState = BreakerState.CLOSED;
-    private failureCount: number = 0;
+    
+    //(Boolean: True=Failure, False=Success)
+    private failureHistory: boolean[] = []; 
+    
     private probeFailureCount: number = 0; 
     private successCount: number = 0;
     private lastFailureTime: number = 0; 
     
-    // Configuration constraints from assignment
-    private readonly maxFailures = 10;
+
+    private readonly maxRequests = 20;         
+    private readonly failureRateThreshold = 0.5; 
     private readonly cooldownPeriod = 30000;
-    private readonly halfOpenProbeCount = 5;
-    private readonly maxProbeFailures = 4; // Max failures allowed in HALF-OPEN
+    private readonly halfOpenProbeCount = 5; 
+    private readonly maxProbeFailures = 4;
 
     private readonly logger = new Logger('CircuitBreaker');
 
-    // NOTE: Returning BreakerState is fine if you are comfortable with the TS4053 fix.
+    // calculate the current precise failure rate over the window
+    private calculateFailureRate(): number {
+        // check window size is full
+        if (this.failureHistory.length < this.maxRequests) {
+            return 0; // Return 0% if we don't have enough data yet
+        }
+        // Count how many 'true' values (failures) are in the last 20 requests
+        const totalFailures = this.failureHistory.filter(isFailure => isFailure).length;
+        
+        return totalFailures / this.maxRequests; // return decimal value
+    }
+
+
     public getState(): BreakerState { 
         return this.state;
     }
@@ -33,43 +49,52 @@ export class CircuitBreaker {
         const currentTime = Date.now();
 
         if (this.state === BreakerState.CLOSED) {
-            // Rule: If failure count hits 10, trip to OPEN
-            if (this.failureCount >= this.maxFailures) {
+            const currentRate = this.calculateFailureRate();
+
+            // Rule: If the window is full AND the rate is >= 50%
+            if (this.failureHistory.length === this.maxRequests && currentRate >= this.failureRateThreshold) {
                 this.state = BreakerState.OPEN;
                 this.lastFailureTime = currentTime;
-                this.logger.error(`STATE CHANGE: CLOSED -> OPEN. Threshold met (${this.failureCount} failures).`);
+                this.logger.error(`STATE CHANGE: CLOSED -> OPEN. Failure Rate (${(currentRate * 100).toFixed(0)}%) met threshold.`);
+                // ACTION: Clear history upon tripping for clean restart later
+                this.failureHistory = []; 
             }
         } 
         
         else if (this.state === BreakerState.OPEN) {
-            // Rule: If cooldown period is over, move to HALF-OPEN
             if (currentTime > this.lastFailureTime + this.cooldownPeriod) {
                 this.state = BreakerState.HALF_OPEN;
                 this.successCount = 0; 
-                this.probeFailureCount = 0; // Reset probe failures when entering HALF-OPEN
+                this.probeFailureCount = 0; 
                 this.logger.warn('STATE CHANGE: OPEN -> HALF-OPEN. Cooldown elapsed. Probing starts.');
             }
         } 
         
         else if (this.state === BreakerState.HALF_OPEN) {
-            // Rule: If success count hits 5, move back to CLOSED
             if (this.successCount >= this.halfOpenProbeCount) {
                 this.state = BreakerState.CLOSED;
-                this.failureCount = 0;
-                this.probeFailureCount = 0; // Reset when healing is complete
+                this.failureHistory = []; // Clear history upon healing
                 this.logger.log('STATE CHANGE: HALF-OPEN -> CLOSED. Service restored.');
             }
         }
     }
 
+    private updateFailureHistory(isFailure: boolean) {
+        if (this.failureHistory.length >= this.maxRequests) {
+            this.failureHistory.shift(); // Remove oldest request
+        }
+        this.failureHistory.push(isFailure); // Add new request result
+    }
+
+
     private recordSuccess() {
         if (this.state === BreakerState.CLOSED) {
-            this.failureCount = Math.max(0, this.failureCount - 1);
-            // ENHANCED LOGGING: Shows decay
-            this.logger.debug(`[CLOSED Success] Failures decayed to: ${this.failureCount}/${this.maxFailures}`);
+            // ACTION: Record success (false) in history array
+            this.updateFailureHistory(false);
+            this.logger.debug(`[CLOSED Success] History size: ${this.failureHistory.length}. Rate: ${(this.calculateFailureRate() * 100).toFixed(0)}%`); 
+            this.checkStateTransition(); // Check if rate causes trip
         } else if (this.state === BreakerState.HALF_OPEN) {
             this.successCount++;
-            // ENHANCED LOGGING: Shows current successful probes
             this.logger.log(`[Probe Success] Count: ${this.successCount}/${this.halfOpenProbeCount} successful probes.`); 
             this.checkStateTransition(); 
         }
@@ -77,21 +102,21 @@ export class CircuitBreaker {
 
     private recordFailure() {
         if (this.state === BreakerState.CLOSED) {
-            this.failureCount++;
-            // ENHANCED LOGGING: Shows count toward trip
-            this.logger.error(`[CLOSED Failure] Count: ${this.failureCount}/${this.maxFailures} failures recorded.`);
+            // ACTION: Record failure (true) in history array
+            this.updateFailureHistory(true);
+            this.logger.debug(`[CLOSED Failure] History size: ${this.failureHistory.length}. Rate: ${(this.calculateFailureRate() * 100).toFixed(0)}%`);
             this.checkStateTransition(); 
         } else if (this.state === BreakerState.HALF_OPEN) {
             
             this.probeFailureCount++;
-            // ENHANCED LOGGING: Shows probe failure count toward immediate trip
-            this.logger.warn(`[Probe Failure] Count: ${this.probeFailureCount}/${this.maxProbeFailures} failures recorded in HALF-OPEN.`); 
+            this.logger.debug(`[Probe Failure] Count: ${this.probeFailureCount}/${this.maxProbeFailures} failures recorded in HALF-OPEN.`); 
 
             // Rule: Flip back to OPEN ONLY if probe failure threshold is hit
             if (this.probeFailureCount >= this.maxProbeFailures) { 
                 this.state = BreakerState.OPEN;
                 this.lastFailureTime = Date.now();
                 this.logger.error(`STATE CHANGE: HALF-OPEN -> OPEN. Probe failure limit (${this.maxProbeFailures}) reached. Resetting cooldown.`);
+                // Note: No need to clear history here, as history is checked only in CLOSED.
             } else {
                  // Remain in HALF-OPEN and continue probing
             }

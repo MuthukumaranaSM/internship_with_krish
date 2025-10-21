@@ -31,7 +31,7 @@ export class AppService implements OnModuleInit {
   // Find events method exposed to the controller
   async findEvents(destination: string, date: string): Promise<EventsSearchResponseDto> {
     const events = await this.eventRepository.find({
-        where: { destination: destination } // Simple filter by destination
+        where: { destination: destination } 
     });
     
     this.logger.debug(`Found ${events.length} events for ${destination}`);

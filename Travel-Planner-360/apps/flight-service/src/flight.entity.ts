@@ -23,4 +23,7 @@ origin: string;
 
 @Column()
 destination: string; 
+
+@Column()
+  date: string;
 }
